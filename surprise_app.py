@@ -1,175 +1,101 @@
 import streamlit as st
-import random
+import pandas as pd
+import plotly.express as px
+import requests
 from openai import OpenAI
+import yfinance as yf
 
-# Configure your page
-st.set_page_config(page_title="Fun AI Playground", layout="wide", initial_sidebar_state="expanded")
+# --- Configuration ---
+TICKERS = ["UPM.HE", "STERV.HE", "VAPO.HE"]  # Add your key forestry tickers here
+NEWS_QUERY = "forest industry OR forestry OR timber OR UPM"
 
-# Custom CSS for styling
-st.markdown(
-    """
-    <style>
-    .feature-box { background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .output-box { background-color: #ffffff; padding: 15px; border-left: 5px solid #4CAF50; border-radius: 5px; margin-top: 10px; }
-    .haiku-box { background-color: #fff8e1; padding: 15px; border-left: 5px solid #FFC107; border-radius: 5px; margin-top: 10px; font-style: italic; }
-    .board { display: grid; grid-template-columns: repeat(3, 60px); gap: 5px; justify-content: center; margin: 10px 0; }
-    .board button { aspect-ratio: 1 / 1; font-size: 24px; }
-    .result-box { background-color: #e1f5fe; padding: 15px; border-left: 5px solid #03a9f4; border-radius: 5px; margin-top: 10px; }
-    </style>
-    """, unsafe_allow_html=True
-)
-
-# Initialize the OpenAI client with API key
+# Initialize clients
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-# Session state initialization
-if 'jokes' not in st.session_state:
-    st.session_state.jokes = []
-if 'board' not in st.session_state:
-    st.session_state.board = [''] * 9
-if 'game_over' not in st.session_state:
-    st.session_state.game_over = False
-if 'winner' not in st.session_state:
-    st.session_state.winner = None
+# Page config
+st.set_page_config(page_title="Forest Industry Pulse", layout="wide")
+st.title("🌲 Forest Industry Pulse")
 
-# App title and sidebar
-st.sidebar.title("🎉 Fun AI Playground")
-mode = st.sidebar.radio("Choose an activity:", ["Summarizer", "Joke Generator", "Haiku Writer", "Tic Tac Toe"] )
+# Sidebar controls
+st.sidebar.header("Settings")
+news_source = st.sidebar.selectbox("News Source", ["Google News", "Bing News"])
+num_headlines = st.sidebar.slider("Number of Headlines", min_value=5, max_value=20, value=10)
+refresh = st.sidebar.button("Refresh Data")
 
-# Main container
-st.markdown("# Welcome!")
+# Refresh action
+if refresh:
+    st.experimental_rerun()
 
-# Summarizer feature
-if mode == "Summarizer":
-    with st.container():
-        st.markdown("<div class='feature-box'>", unsafe_allow_html=True)
-        st.header("📝 Text Summarizer")
-        input_text = st.text_area("Paste or write text here...")
-        if st.button("Summarize"):
-            if not input_text.strip():
-                st.error("Please enter some text first.")
-            else:
-                with st.spinner("Summarizing..."):
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": "You are a friendly assistant that provides concise summaries."},
-                            {"role": "user",   "content": f"Summarize the following text:\n\n{input_text}"}
-                        ],
-                        temperature=0.7,
-                        max_tokens=200
-                    )
-                    summary = response.choices[0].message.content.strip()
-                st.markdown(f"<div class='output-box'>{summary}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+# --- Real-time Stock Tracker ---
+st.header("📈 Real-time Stock Prices")
+stock_data = []
+for ticker in TICKERS:
+    try:
+        hist = yf.Ticker(ticker).history(period="1d", interval="5m")
+        latest_price = hist["Close"].iloc[-1]
+        stock_data.append({"Ticker": ticker, "Price (EUR)": latest_price})
+    except Exception as e:
+        stock_data.append({"Ticker": ticker, "Price (EUR)": "N/A"})
+stock_df = pd.DataFrame(stock_data).set_index("Ticker")
+col1, col2 = st.columns([1, 2])
+with col1:
+    st.dataframe(stock_df, height=200)
+with col2:
+    # Plot intraday for first ticker as example
+    example = TICKERS[0]
+    df_plot = yf.Ticker(example).history(period="1d", interval="15m")["Close"].reset_index()
+    fig = px.line(df_plot, x="Datetime", y="Close", title=f"Intraday Price: {example}")
+    st.plotly_chart(fig, use_container_width=True)
 
-# Joke generator feature
-elif mode == "Joke Generator":
-    with st.container():
-        st.markdown("<div class='feature-box'>", unsafe_allow_html=True)
-        st.header("🤣 Joke Generator")
-        if st.button("Tell me a joke!"):
-            with st.spinner("Thinking..."):
-                attempts = 0
-                joke = ""
-                while attempts < 3:
-                    resp = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": "You are a stand-up comedian who always provides a new, family-friendly joke."},
-                            {"role": "user",   "content": "Tell me a funny, family-friendly joke."}
-                        ],
-                        temperature=0.9,
-                        max_tokens=150
-                    )
-                    joke = resp.choices[0].message.content.strip()
-                    if joke not in st.session_state.jokes:
-                        st.session_state.jokes.append(joke)
-                        break
-                    attempts += 1
-                st.markdown(f"<div class='output-box'>{joke}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+# --- News Headlines ---
+st.header("📰 Recent News Headlines")
+articles = []
+if news_source == "Google News":
+    url = f"https://newsapi.org/v2/everything?q={NEWS_QUERY}&apiKey={st.secrets['news']['google_api_key']}&pageSize={num_headlines}&sortBy=publishedAt"
+    res = requests.get(url).json()
+    articles = res.get("articles", [])
+else:
+    # Placeholder for Bing News Search
+    # You can implement Bing News Search API similarly
+    url = f"https://api.bing.microsoft.com/v7.0/news/search?q={NEWS_QUERY}&count={num_headlines}"
+    headers = {"Ocp-Apim-Subscription-Key": st.secrets['news']['bing_api_key']}
+    res = requests.get(url, headers=headers).json()
+    articles = res.get("value", [])
 
-# Haiku writer feature
-elif mode == "Haiku Writer":
-    with st.container():
-        st.markdown("<div class='feature-box'>", unsafe_allow_html=True)
-        st.header("🌸 Haiku Writer")
-        topic = st.text_input("Topic for haiku (e.g., sunrise, forest, rainy day):")
-        if st.button("Generate Haiku"):
-            if not topic.strip():
-                st.error("Please provide a topic.")
-            else:
-                with st.spinner("Composing haiku..."):
-                    response = client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[
-                            {"role": "system", "content": "You are a poet specializing in traditional Japanese haiku."},
-                            {"role": "user",   "content": f"Write a beautiful, evocative haiku about {topic}."}
-                        ],
-                        temperature=0.8,
-                        max_tokens=50
-                    )
-                    haiku = response.choices[0].message.content.strip()
-                st.markdown(f"<div class='haiku-box'>{haiku}</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+# Display headlines
+for idx, art in enumerate(articles, start=1):
+    title = art.get("title")
+    src = art.get("source", {}).get("name") if news_source == "Google News" else art.get("provider", [{}])[0].get("name")
+    time = art.get("publishedAt") if news_source == "Google News" else art.get("datePublished")
+    st.markdown(f"**{idx}. [{title}]({art.get('url')})**  
+_Source: {src} | Published: {time}_")
 
-# Tic Tac Toe feature
-elif mode == "Tic Tac Toe":
-    with st.container():
-        st.markdown("<div class='feature-box'>", unsafe_allow_html=True)
-        st.header("🎲 Tic Tac Toe vs AI")
-        if st.button("Reset Game"):
-            st.session_state.board = [''] * 9
-            st.session_state.game_over = False
-            st.session_state.winner = None
+# --- AI Insights ---
+st.header("🤖 AI Summaries & Sentiment Analysis")
+for art in articles:
+    title = art.get("title")
+    url = art.get("url") if news_source == "Google News" else art.get("url")
+    with st.expander(title):
+        prompt = (
+            f"You are a financial analyst.\n"
+            f"Article title: {title}\n"
+            f"Provide:\n"
+            f"1. A concise summary (2-3 sentences).\n"
+            f"2. Sentiment (Positive, Neutral, Negative) based on the title.\n"
+            f"3. Key risk or trend highlight.\n"
+        )
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a helpful, concise AI financial assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=200
+        )
+        insight = response.choices[0].message.content.strip()
+        st.write(insight)
 
-        # Function to check winner
-        def check_winner(b):
-            wins = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
-            for i,j,k in wins:
-                if b[i] and b[i] == b[j] == b[k]:
-                    return b[i]
-            if all(b):
-                return 'Draw'
-            return None
-
-        # Handle player click
-        clicked_cell = None
-        cols = st.empty()
-        for idx in range(9):
-            if idx % 3 == 0:
-                cols = st.columns(3)
-            col = cols[idx % 3]
-            if col.button(st.session_state.board[idx] or " ", key=f"cell_{idx}") and not st.session_state.game_over:
-                clicked_cell = idx
-
-        # Update board with player move then AI
-        if clicked_cell is not None and st.session_state.board[clicked_cell] == '':
-            st.session_state.board[clicked_cell] = 'X'
-            # Check immediate win
-            result = check_winner(st.session_state.board)
-            if not result:
-                # AI move
-                empty = [i for i, v in enumerate(st.session_state.board) if v == '']
-                if empty:
-                    ai_move = random.choice(empty)
-                    st.session_state.board[ai_move] = 'O'
-            # Check post-AI win/draw
-            result = check_winner(st.session_state.board)
-            if result:
-                st.session_state.game_over = True
-                st.session_state.winner = result
-
-        # Render board state in grid
-        st.markdown("<div class='board'>", unsafe_allow_html=True)
-        for idx in range(9):
-            symbol = st.session_state.board[idx] or ''
-            st.markdown(f"<button disabled style='width:100%; height:100%;'>{symbol}</button>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # Show result
-        if st.session_state.game_over:
-            msg = "It's a draw!" if st.session_state.winner == 'Draw' else f"{st.session_state.winner} wins!"
-            st.markdown(f"<div class='result-box'><strong>{msg}</strong></div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+# Footer
+st.markdown("---")
+st.caption("Built with ❤️ by [Your Name]")
