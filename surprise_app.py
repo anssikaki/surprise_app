@@ -108,4 +108,8 @@ if st.session_state.get("generated", False):
                 img_url = img_resp.data[0].url
                 st.image(img_url, caption="Concept Art", use_column_width=True)
             except OpenAIError as e:
-                st.error(f"Image generation failed: {e}")
+                # extract detailed message if available
+                err_msg = None
+                if hasattr(e, 'error') and isinstance(e.error, dict):
+                    err_msg = e.error.get('message')
+                st.error(f"Image generation failed: {err_msg or str(e)}. Make sure your API key has DALL·E access enabled.")
