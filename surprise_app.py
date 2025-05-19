@@ -1,9 +1,11 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 
 # Configure your page
 st.set_page_config(page_title="Fun AI Playground", layout="wide")
-openai.api_key = st.secrets["openai"]["api_key"]
+
+# Initialize the OpenAI client (v1+)
+client = OpenAI()
 
 # App title and sidebar
 st.markdown("# 🎉 Welcome to the Fun AI Playground!")
@@ -18,7 +20,7 @@ if mode == "Summarizer":
             st.error("Please paste or write some text first.")
         else:
             with st.spinner("Summarizing..."):
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-4o",  # or gpt-3.5-turbo
                     messages=[
                         {"role": "system", "content": "You are a friendly assistant that provides concise summaries."},
@@ -35,7 +37,7 @@ elif mode == "Joke Generator":
     st.header("🤣 Joke Generator")
     if st.button("Tell me a joke!"):
         with st.spinner("Thinking of something funny..."):
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4o",  # or gpt-3.5-turbo
                 messages=[
                     {"role": "system", "content": "You are a stand-up comedian with a knack for light-hearted, family-friendly humor."},
@@ -56,7 +58,7 @@ elif mode == "Haiku Writer":
             st.error("Please provide a topic for your haiku.")
         else:
             with st.spinner("Composing haiku..."):
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="gpt-4o",  # or gpt-3.5-turbo
                     messages=[
                         {"role": "system", "content": "You are a poet specializing in traditional Japanese haiku."},
