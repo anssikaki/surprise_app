@@ -74,6 +74,18 @@ if news_source == "Google News":
             f"q={requests.utils.quote(NEWS_QUERY)}&qInTitle=forest&"
             f"sortBy=publishedAt&pageSize={num_headlines}&apiKey={google_key}"
         )
+        
+        NEWS_QUERY = "forest industry Finland"
+        url = (
+            f"https://newsapi.org/v2/everything?"
+            f"q={requests.utils.quote(NEWS_QUERY)}&"
+            f"searchIn=title,description,content&"
+            f"language=en&"
+            f"sortBy=publishedAt&"
+            f"pageSize={num_headlines}&"
+            f"apiKey={api_key}"
+        )
+        
         res = requests.get(url)
         if res.ok:
             articles = [a for a in res.json().get("articles", []) if "forest" in a.get("title", "").lower()]
