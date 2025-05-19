@@ -4,8 +4,8 @@ from openai import OpenAI
 # Configure your page
 st.set_page_config(page_title="Fun AI Playground", layout="wide")
 
-# Initialize the OpenAI client (v1+)
-client = OpenAI()
+# Initialize the OpenAI client with API key from Streamlit secrets
+client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
 # App title and sidebar
 st.markdown("# 🎉 Welcome to the Fun AI Playground!")
