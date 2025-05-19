@@ -12,8 +12,8 @@ st.markdown(
     .feature-box { background-color: #f9f9f9; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .output-box { background-color: #ffffff; padding: 15px; border-left: 5px solid #4CAF50; border-radius: 5px; margin-top: 10px; }
     .haiku-box { background-color: #fff8e1; padding: 15px; border-left: 5px solid #FFC107; border-radius: 5px; margin-top: 10px; font-style: italic; }
-    .board-button { width: 60px; height: 60px; font-size: 24px; margin: 1px; }
-    .board-row { display: flex; justify-content: center; }
+    .board { display: grid; grid-template-columns: repeat(3, 60px); gap: 5px; justify-content: center; margin: 10px 0; }
+    .board button { aspect-ratio: 1 / 1; font-size: 24px; }
     .result-box { background-color: #e1f5fe; padding: 15px; border-left: 5px solid #03a9f4; border-radius: 5px; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True
@@ -119,12 +119,11 @@ elif mode == "Tic Tac Toe":
     with st.container():
         st.markdown("<div class='feature-box'>", unsafe_allow_html=True)
         st.header("🎲 Tic Tac Toe vs AI")
-        # Reset game button
         if st.button("Reset Game"):
             st.session_state.board = [''] * 9
             st.session_state.game_over = False
             st.session_state.winner = None
-        
+
         # Function to check winner
         def check_winner(b):
             wins = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
@@ -135,28 +134,39 @@ elif mode == "Tic Tac Toe":
                 return 'Draw'
             return None
 
-        # Display board
-        cols = st.columns(3)
+        # Handle player click
+        clicked_cell = None
+        cols = st.empty()
         for idx in range(9):
-            col = cols[idx % 3]
-            if col.button(st.session_state.board[idx] or " ", key=f"cell_{idx}", help="Click to place X", use_container_width=True):
-                if not st.session_state.board[idx] and not st.session_state.game_over:
-                    st.session_state.board[idx] = 'X'
-                    # AI move
-                    if not st.session_state.game_over:
-                        empty = [i for i, v in enumerate(st.session_state.board) if not v]
-                        if empty:
-                            ai_move = random.choice(empty)
-                            st.session_state.board[ai_move] = 'O'
-            if idx % 3 == 2:
+            if idx % 3 == 0:
                 cols = st.columns(3)
+            col = cols[idx % 3]
+            if col.button(st.session_state.board[idx] or " ", key=f"cell_{idx}") and not st.session_state.game_over:
+                clicked_cell = idx
 
-        # Check game state
-        if not st.session_state.game_over:
+        # Update board with player move then AI
+        if clicked_cell is not None and st.session_state.board[clicked_cell] == '':
+            st.session_state.board[clicked_cell] = 'X'
+            # Check immediate win
+            result = check_winner(st.session_state.board)
+            if not result:
+                # AI move
+                empty = [i for i, v in enumerate(st.session_state.board) if v == '']
+                if empty:
+                    ai_move = random.choice(empty)
+                    st.session_state.board[ai_move] = 'O'
+            # Check post-AI win/draw
             result = check_winner(st.session_state.board)
             if result:
                 st.session_state.game_over = True
                 st.session_state.winner = result
+
+        # Render board state in grid
+        st.markdown("<div class='board'>", unsafe_allow_html=True)
+        for idx in range(9):
+            symbol = st.session_state.board[idx] or ''
+            st.markdown(f"<button disabled style='width:100%; height:100%;'>{symbol}</button>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # Show result
         if st.session_state.game_over:
