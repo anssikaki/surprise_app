@@ -83,7 +83,7 @@ if news_source == "Google News":
             f"language=en&"
             f"sortBy=publishedAt&"
             f"pageSize={num_headlines}&"
-            f"apiKey={api_key}"
+            f"apiKey={google_key}"
         )
         
         res = requests.get(url)
