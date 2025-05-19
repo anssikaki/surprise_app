@@ -33,7 +33,7 @@ st.title("🌲 Forest Industry Pulse")
 # Sidebar controls
 st.sidebar.header("Settings")
 news_source = st.sidebar.selectbox("News Source", ["Google News", "Bing News"])
-num_headlines = st.sidebar.slider("Number of Headlines", min_value=5, max_value=20, value=10)
+num_headlines = st.sidebar.slider("Number of Headlines", min_value=1, max_value=20, value=5)
 if st.sidebar.button("Refresh Data"):
     st.experimental_rerun()
 
@@ -68,14 +68,15 @@ if news_source == "Google News":
     if not google_key:
         st.error("Google News API key missing. Add under [news] in Streamlit secrets.")
     else:
+        # Use 'everything' with qInTitle to filter forest-specific headlines
         url = (
             f"https://newsapi.org/v2/everything?"
-            f"q={requests.utils.quote(NEWS_QUERY)}&language=fi&"
-            f"pageSize={num_headlines}&apiKey={google_key}"
+            f"q={requests.utils.quote(NEWS_QUERY)}&qInTitle=forest&"
+            f"sortBy=publishedAt&pageSize={num_headlines}&apiKey={google_key}"
         )
         res = requests.get(url)
         if res.ok:
-            articles = res.json().get("articles", [])
+            articles = [a for a in res.json().get("articles", []) if "forest" in a.get("title", "").lower()]
         else:
             st.error(f"Google News API error: {res.status_code}")
 elif news_source == "Bing News":
@@ -97,7 +98,6 @@ elif news_source == "Bing News":
 if not articles:
     st.warning("No news articles found. Try a different news source or adjust the number of headlines.")
 
-# Display headlines vertically
 for idx, art in enumerate(articles, start=1):
     title = art.get("title", "No title")
     link = art.get("url", art.get("link", "#"))
@@ -107,9 +107,7 @@ for idx, art in enumerate(articles, start=1):
     else:
         src = art.get("provider", [{}])[0].get("name")
         time = art.get("datePublished")
-    st.markdown(
-        f"**{idx}. [{title}]({link})**  \n_Source: {src} | {time}_"
-    )
+    st.markdown(f"**{idx}. [{title}]({link})**  \n_Source: {src} | {time}_")
 
 # --- AI Insights ---
 st.header("🤖 AI Summaries & Sentiment Analysis")
