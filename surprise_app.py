@@ -4,6 +4,7 @@ import plotly.express as px
 import requests
 from openai import OpenAI
 import yfinance as yf
+import random
 
 # --- Configuration ---
 TICKERS = ["UPM.HE", "STERV.HE", "VAPO.HE"]  # Add your key forestry tickers here
@@ -22,7 +23,6 @@ news_source = st.sidebar.selectbox("News Source", ["Google News", "Bing News"])
 num_headlines = st.sidebar.slider("Number of Headlines", min_value=5, max_value=20, value=10)
 refresh = st.sidebar.button("Refresh Data")
 
-# Refresh action
 if refresh:
     st.experimental_rerun()
 
@@ -34,14 +34,14 @@ for ticker in TICKERS:
         hist = yf.Ticker(ticker).history(period="1d", interval="5m")
         latest_price = hist["Close"].iloc[-1]
         stock_data.append({"Ticker": ticker, "Price (EUR)": latest_price})
-    except Exception as e:
+    except Exception:
         stock_data.append({"Ticker": ticker, "Price (EUR)": "N/A"})
+
 stock_df = pd.DataFrame(stock_data).set_index("Ticker")
 col1, col2 = st.columns([1, 2])
 with col1:
     st.dataframe(stock_df, height=200)
 with col2:
-    # Plot intraday for first ticker as example
     example = TICKERS[0]
     df_plot = yf.Ticker(example).history(period="1d", interval="15m")["Close"].reset_index()
     fig = px.line(df_plot, x="Datetime", y="Close", title=f"Intraday Price: {example}")
@@ -49,32 +49,43 @@ with col2:
 
 # --- News Headlines ---
 st.header("📰 Recent News Headlines")
-articles = []
+# Fetch articles
 if news_source == "Google News":
-    url = f"https://newsapi.org/v2/everything?q={NEWS_QUERY}&apiKey={st.secrets['news']['google_api_key']}&pageSize={num_headlines}&sortBy=publishedAt"
+    url = (
+        f"https://newsapi.org/v2/everything?q={NEWS_QUERY}"
+        f"&apiKey={st.secrets['news']['google_api_key']}"
+        f"&pageSize={num_headlines}&sortBy=publishedAt"
+    )
     res = requests.get(url).json()
     articles = res.get("articles", [])
 else:
-    # Placeholder for Bing News Search
-    # You can implement Bing News Search API similarly
-    url = f"https://api.bing.microsoft.com/v7.0/news/search?q={NEWS_QUERY}&count={num_headlines}"
+    url = (
+        f"https://api.bing.microsoft.com/v7.0/news/search?q={NEWS_QUERY}&count={num_headlines}"
+    )
     headers = {"Ocp-Apim-Subscription-Key": st.secrets['news']['bing_api_key']}
     res = requests.get(url, headers=headers).json()
     articles = res.get("value", [])
 
 # Display headlines
 for idx, art in enumerate(articles, start=1):
-    title = art.get("title")
-    src = art.get("source", {}).get("name") if news_source == "Google News" else art.get("provider", [{}])[0].get("name")
-    time = art.get("publishedAt") if news_source == "Google News" else art.get("datePublished")
-    st.markdown(f"**{idx}. [{title}]({art.get('url')})**  
-_Source: {src} | Published: {time}_")
+    title = art.get("title", "No title")
+    link = art.get("url", "#")
+    if news_source == "Google News":
+        src = art.get("source", {}).get("name")
+        time = art.get("publishedAt")
+    else:
+        src = art.get("provider", [{}])[0].get("name")
+        time = art.get("datePublished")
+    st.markdown(
+        f"""**{idx}. [{title}]({link})**  
+_Source: {src} | Published: {time}_"""
+    )
 
 # --- AI Insights ---
 st.header("🤖 AI Summaries & Sentiment Analysis")
 for art in articles:
-    title = art.get("title")
-    url = art.get("url") if news_source == "Google News" else art.get("url")
+    title = art.get("title", "No title")
+    link = art.get("url", "#")
     with st.expander(title):
         prompt = (
             f"You are a financial analyst.\n"
