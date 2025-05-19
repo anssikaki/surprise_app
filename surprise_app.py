@@ -79,7 +79,6 @@ if news_source == "Google News":
         url = (
             f"https://newsapi.org/v2/everything?"
             f"q={requests.utils.quote(NEWS_QUERY)}&"
-            f"searchIn=title,description,content&"
             f"language=en&"
             f"sortBy=publishedAt&"
             f"pageSize={num_headlines}&"
