@@ -30,7 +30,7 @@ stock_data = []
 price_dfs = []
 for ticker in TICKERS:
     try:
-        hist = yf.Ticker(ticker).history(period="1d", interval="5m")[["Close"]].reset_index()
+        hist = yf.Ticker(ticker).history(period="7d", interval="5m")[["Close"]].reset_index()
         hist.rename(columns={"Close": "Price"}, inplace=True)
         hist["Ticker"] = ticker
         latest_price = hist["Price"].iloc[-1]
