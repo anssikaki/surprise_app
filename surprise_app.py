@@ -102,8 +102,10 @@ for idx, art in enumerate(articles, start=1):
     else:
         src = art.get("provider", [{}])[0].get("name")
         time = art.get("datePublished")
-    st.markdown(f"**{idx}. [{title}]({link})**  
-_Source: {src} | {time}_")
+    st.markdown(
+        f"""**{idx}. [{title}]({link})**  
+_Service: {src} | {time}_"""
+    )
 
 # --- AI Insights ---
 st.header("🤖 AI Summaries & Sentiment Analysis")
