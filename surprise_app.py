@@ -11,7 +11,7 @@ TICKERS = ["UPM.HE", "STERV.HE", "VAPO.HE"]  # Add your key forestry tickers her
 NEWS_QUERY = "forest industry OR forestry OR timber OR UPM"
 
 # Initialize clients
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+client = OpenAI(api_key=st.secrets.get("openai", {}).get("api_key", ""))
 
 # Page config
 st.set_page_config(page_title="Forest Industry Pulse", layout="wide")
@@ -21,9 +21,7 @@ st.title("🌲 Forest Industry Pulse")
 st.sidebar.header("Settings")
 news_source = st.sidebar.selectbox("News Source", ["Google News", "Bing News"])
 num_headlines = st.sidebar.slider("Number of Headlines", min_value=5, max_value=20, value=10)
-refresh = st.sidebar.button("Refresh Data")
-
-if refresh:
+if st.sidebar.button("Refresh Data"):
     st.experimental_rerun()
 
 # --- Real-time Stock Tracker ---
@@ -49,22 +47,34 @@ with col2:
 
 # --- News Headlines ---
 st.header("📰 Recent News Headlines")
-# Fetch articles
+# Fetch articles safely
+articles = []
 if news_source == "Google News":
-    url = (
-        f"https://newsapi.org/v2/everything?q={NEWS_QUERY}"
-        f"&apiKey={st.secrets['news']['google_api_key']}"
-        f"&pageSize={num_headlines}&sortBy=publishedAt"
-    )
-    res = requests.get(url).json()
-    articles = res.get("articles", [])
-else:
-    url = (
-        f"https://api.bing.microsoft.com/v7.0/news/search?q={NEWS_QUERY}&count={num_headlines}"
-    )
-    headers = {"Ocp-Apim-Subscription-Key": st.secrets['news']['bing_api_key']}
-    res = requests.get(url, headers=headers).json()
-    articles = res.get("value", [])
+    google_key = st.secrets.get('news', {}).get('google_api_key')
+    if not google_key:
+        st.error("Google News API key missing. Please add it to Streamlit secrets under [news].")
+    else:
+        url = (
+            f"https://newsapi.org/v2/everything?q={NEWS_QUERY}"
+            f"&apiKey={google_key}&pageSize={num_headlines}&sortBy=publishedAt"
+        )
+        res = requests.get(url)
+        if res.status_code == 200:
+            articles = res.json().get("articles", [])
+        else:
+            st.error(f"News API error: {res.status_code}")
+elif news_source == "Bing News":
+    bing_key = st.secrets.get('news', {}).get('bing_api_key')
+    if not bing_key:
+        st.error("Bing News API key missing. Please add it to Streamlit secrets under [news].")
+    else:
+        url = f"https://api.bing.microsoft.com/v7.0/news/search?q={NEWS_QUERY}&count={num_headlines}"
+        headers = {"Ocp-Apim-Subscription-Key": bing_key}
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            articles = res.json().get("value", [])
+        else:
+            st.error(f"Bing News API error: {res.status_code}")
 
 # Display headlines
 for idx, art in enumerate(articles, start=1):
@@ -78,21 +88,21 @@ for idx, art in enumerate(articles, start=1):
         time = art.get("datePublished")
     st.markdown(
         f"""**{idx}. [{title}]({link})**  
-_Source: {src} | Published: {time}_"""
+_Source: {src} | Published: {time}_""",
+        unsafe_allow_html=False
     )
 
 # --- AI Insights ---
 st.header("🤖 AI Summaries & Sentiment Analysis")
 for art in articles:
     title = art.get("title", "No title")
-    link = art.get("url", "#")
     with st.expander(title):
         prompt = (
             f"You are a financial analyst.\n"
             f"Article title: {title}\n"
             f"Provide:\n"
             f"1. A concise summary (2-3 sentences).\n"
-            f"2. Sentiment (Positive, Neutral, Negative) based on the title.\n"
+            f"2. Sentiment (Positive, Neutral, Negative).\n"
             f"3. Key risk or trend highlight.\n"
         )
         response = client.chat.completions.create(
