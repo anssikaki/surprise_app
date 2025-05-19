@@ -7,14 +7,15 @@ import yfinance as yf
 
 # --- Configuration ---
 TICKERS = ["UPM.HE", "STERV.HE", "METSB.HE"]  # Key forestry tickers: UPM, Stora Enso, Metsä Board
+NEWS_QUERY = "forest industry OR forestry OR timber OR UPM"
 
-# Initialize clients
+# Initialize OpenAI client
 client = OpenAI(api_key=st.secrets.get("openai", {}).get("api_key", ""))
 
 # Page config (centered layout for mobile)
 st.set_page_config(page_title="Forest Industry Pulse", layout="centered")
 
-# Custom CSS for responsive fonts and tables
+# Responsive CSS for mobile
 st.markdown(
     """
     <style>
@@ -45,17 +46,14 @@ for ticker in TICKERS:
         hist = yf.Ticker(ticker).history(period="1d", interval="5m")[["Close"]].reset_index()
         hist.rename(columns={"Close": "Price"}, inplace=True)
         hist["Ticker"] = ticker
-        latest_price = hist["Price"].iloc[-1]
-        stock_data.append({"Ticker": ticker, "Latest Price (EUR)": latest_price})
+        stock_data.append({"Ticker": ticker, "Latest Price (EUR)": hist["Price"].iloc[-1]})
         price_dfs.append(hist)
     except Exception:
         stock_data.append({"Ticker": ticker, "Latest Price (EUR)": "N/A"})
 
-# Display latest prices as full-width table
 price_df = pd.DataFrame(stock_data).set_index("Ticker")
 st.dataframe(price_df)
 
-# Plot intraday for all tickers full-width
 if price_dfs:
     all_prices = pd.concat(price_dfs)
     fig = px.line(all_prices, x="Datetime", y="Price", color="Ticker", title="Intraday Prices for All Companies")
@@ -68,11 +66,12 @@ articles = []
 if news_source == "Google News":
     google_key = st.secrets.get('news', {}).get('google_api_key')
     if not google_key:
-        st.error("Google News API key missing. Please add it to Streamlit secrets under [news].")
+        st.error("Google News API key missing. Add under [news] in Streamlit secrets.")
     else:
         url = (
-            f"https://newsapi.org/v2/top-headlines?country=fi"
-            f"&category=business&pageSize={num_headlines}&apiKey={google_key}"
+            f"https://newsapi.org/v2/everything?"
+            f"q={requests.utils.quote(NEWS_QUERY)}&language=fi&"
+            f"pageSize={num_headlines}&apiKey={google_key}"
         )
         res = requests.get(url)
         if res.ok:
@@ -82,9 +81,12 @@ if news_source == "Google News":
 elif news_source == "Bing News":
     bing_key = st.secrets.get('news', {}).get('bing_api_key')
     if not bing_key:
-        st.error("Bing News API key missing. Please add it to Streamlit secrets under [news].")
+        st.error("Bing News API key missing. Add under [news] in Streamlit secrets.")
     else:
-        url = f"https://api.bing.microsoft.com/v7.0/news/search?q=forest%20industry&count={num_headlines}"
+        url = (
+            f"https://api.bing.microsoft.com/v7.0/news/search?"
+            f"q=forest%20industry&count={num_headlines}"
+        )
         headers = {"Ocp-Apim-Subscription-Key": bing_key}
         res = requests.get(url, headers=headers)
         if res.ok:
@@ -92,7 +94,10 @@ elif news_source == "Bing News":
         else:
             st.error(f"Bing News API error: {res.status_code}")
 
-# Display headlines stacked vertically for mobile
+if not articles:
+    st.warning("No news articles found. Try a different news source or adjust the number of headlines.")
+
+# Display headlines vertically
 for idx, art in enumerate(articles, start=1):
     title = art.get("title", "No title")
     link = art.get("url", art.get("link", "#"))
@@ -103,8 +108,7 @@ for idx, art in enumerate(articles, start=1):
         src = art.get("provider", [{}])[0].get("name")
         time = art.get("datePublished")
     st.markdown(
-        f"""**{idx}. [{title}]({link})**  
-_Service: {src} | {time}_"""
+        f"**{idx}. [{title}]({link})**  \n_Source: {src} | {time}_"
     )
 
 # --- AI Insights ---
@@ -130,10 +134,28 @@ for art in articles:
                 temperature=0.7,
                 max_tokens=200
             )
-            insight = response.choices[0].message.content.strip()
-            st.write(insight)
-        except Exception:
+            st.write(response.choices[0].message.content.strip())
+        except:
             st.error("Failed to fetch AI insight.")
+
+# --- Chat Box ---
+st.header("💬 Ask the Pulse")
+user_question = st.text_input("Enter your question for the forest industry AI:")
+if st.button("Ask"):
+    if user_question.strip():
+        with st.spinner("Thinking..."):
+            chat_resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are an expert on the forest industry with access to real-time data."},
+                    {"role": "user", "content": user_question}
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            st.write(chat_resp.choices[0].message.content.strip())
+    else:
+        st.error("Please enter a question.")
 
 # Footer
 st.markdown("---")
