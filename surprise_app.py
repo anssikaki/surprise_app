@@ -29,13 +29,15 @@ with st.form(key="input_form"):
     year = st.number_input("📅 Future Year", min_value=2025, max_value=2100, value=2030)
     generate = st.form_submit_button("✨ Generate Press Release")
 
-# Core interaction
+# On generate: create release and initialize session state
 if generate:
     if not company.strip() or not product.strip():
         st.error("Please fill in both company and product/idea. 🤚")
     else:
-        # Visual flourish
-        st.balloons()
+        st.session_state.generated = True
+        st.session_state.company = company
+        st.session_state.product = product
+        st.session_state.year = year
         prompt = (
             f"Write a whimsical, visionary corporate press release as if it were published in {year} by {company}, "
             f"announcing their revolutionary {product}. "
@@ -54,49 +56,56 @@ if generate:
                     max_tokens=600,
                 )
                 release = response.choices[0].message.content.strip()
-                st.subheader("📰 Your Future Press Release")
-                st.markdown(release)
-
-                # Initialize chat state
-                if "messages" not in st.session_state:
-                    st.session_state.messages = [
-                        {"role": "system", "content": "You are now chatting as the press release content. Respond playfully and in-character."},
-                        {"role": "assistant", "content": release}
-                    ]
-
-                # Chat interface
-                st.divider()
-                st.subheader("💬 Chat with Your Press Release")
-                user_msg = st.text_input("Ask the press release anything:")
-                if user_msg:
-                    st.session_state.messages.append({"role": "user", "content": user_msg})
-                    with st.spinner("🤖 Thinking..."):
-                        chat_resp = client.chat.completions.create(
-                            model="gpt-4o",
-                            messages=st.session_state.messages,
-                            temperature=0.7,
-                            max_tokens=300,
-                        )
-                        answer = chat_resp.choices[0].message.content.strip()
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
-                        st.markdown(f"**Press Release says:** {answer}")
-
-                # Visual concept art
-                st.divider()
-                st.subheader("🖼️ Generate Concept Art")
-                if st.button("Create Futuristic Concept Image"):
-                    image_prompt = f"High-definition illustration in vibrant neon of {company}'s {product} in the year {year}, visionary, sleek, futuristic style"
-                    with st.spinner("🎨 Rendering image..."):
-                        try:
-                            img_resp = client.images.generate(
-                                prompt=image_prompt,
-                                size="1024x1024",
-                                n=1
-                            )
-                            img_url = img_resp.data[0].url
-                            st.image(img_url, caption="Concept Art", use_column_width=True)
-                        except OpenAIError as e:
-                            st.error(f"Image generation failed: {e}")
-
+                st.session_state.press_release = release
+                # Initialize chat messages
+                st.session_state.messages = [
+                    {"role": "system", "content": "You are now chatting as the press release content. Respond playfully and in-character."},
+                    {"role": "assistant", "content": release}
+                ]
             except OpenAIError as e:
                 st.error(f"Failed to generate press release: {e}")
+
+# If a release exists in session state, show it, chat, and image tools
+if st.session_state.get("generated", False):
+    st.subheader("📰 Your Future Press Release")
+    st.markdown(st.session_state.press_release)
+
+    # Chat interface
+    st.divider()
+    st.subheader("💬 Chat with Your Press Release")
+    user_msg = st.text_input("Ask the press release anything:", key="chat_input")
+    if user_msg:
+        st.session_state.messages.append({"role": "user", "content": user_msg})
+        with st.spinner("🤖 Thinking..."):
+            try:
+                chat_resp = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=st.session_state.messages,
+                    temperature=0.7,
+                    max_tokens=300,
+                )
+                answer = chat_resp.choices[0].message.content.strip()
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.markdown(f"**Press Release says:** {answer}")
+            except OpenAIError as e:
+                st.error(f"Chat generation failed: {e}")
+
+    # Concept art generation
+    st.divider()
+    st.subheader("🖼️ Generate Concept Art")
+    if st.button("Create Futuristic Concept Image", key="image_button"):
+        image_prompt = (
+            f"High-definition illustration in vibrant neon of {st.session_state.company}'s "
+            f"{st.session_state.product} in the year {st.session_state.year}, visionary, sleek, futuristic style"
+        )
+        with st.spinner("🎨 Rendering image..."):
+            try:
+                img_resp = client.images.generate(
+                    prompt=image_prompt,
+                    size="1024x1024",
+                    n=1
+                )
+                img_url = img_resp.data[0].url
+                st.image(img_url, caption="Concept Art", use_column_width=True)
+            except OpenAIError as e:
+                st.error(f"Image generation failed: {e}")
