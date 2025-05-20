@@ -34,6 +34,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Utility functions -----------------------------------------------------------
+
+def build_prompt(company_name: str, future_year: int, additional_details: str) -> str:
+    """Return the prompt for the OpenAI model."""
+    return (
+        f"Write a press release from the year {future_year} about {company_name}. "
+        f"Include the following details if relevant: {additional_details}. "
+        "Make it futuristic, engaging, and optimistic."
+    )
+
+
+def read_log_file(path: str = "app.log", max_lines: int = 200) -> str:
+    """Return the last ``max_lines`` lines from the log file."""
+    if not os.path.exists(path):
+        return "Log file does not exist."
+    try:
+        with open(path, "r") as fh:
+            lines = fh.readlines()
+        return "".join(lines[-max_lines:])
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Error reading log file: %s", exc)
+        return f"Failed to read log file: {exc}"
+
 # Retrieve OpenAI API key from Streamlit secrets or environment variable
 api_key = st.secrets.get("openai", {}).get("api_key") or os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key) if api_key else None
@@ -62,11 +85,7 @@ if st.button("Generate press release"):
     elif not company_name:
         st.error("Please provide a company name.")
     else:
-        prompt = (
-            f"Write a press release from the year {future_year} about {company_name}. "
-            f"Include the following details if relevant: {additional_details}. "
-            "Make it futuristic, engaging, and optimistic."
-        )
+        prompt = build_prompt(company_name, future_year, additional_details)
         logger.info("Generating press release for %s (%s)", company_name, future_year)
         try:
             response = client.chat.completions.create(
@@ -126,4 +145,9 @@ if st.session_state["press_release"]:
             except Exception as exc:
                 logger.exception("Error during chat: %s", exc)
                 st.error(f"An error occurred: {exc}")
+
+# ----------------------------- Log viewer ----------------------------------
+with st.expander("View Application Log"):
+    num_lines = st.slider("Lines to display", min_value=10, max_value=500, value=100, step=10)
+    st.code(read_log_file("app.log", int(num_lines)), language="text")
 
