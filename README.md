@@ -1,11 +1,12 @@
-# Press Release from the Future
+# UPM Press Release from the Future
 
-This Streamlit application generates creative press releases set in the future for any company. It uses the OpenAI API for text generation and stores detailed logs of interactions.
+This Streamlit application generates creative press releases set in the future for any company. It uses the OpenAI API for text generation and stores detailed logs of interactions. The interface approximates the UPM visual style.
 
 ## Features
 
 - Input company name, future year, and optional details.
 - Generates a futuristic press release with OpenAI's chat model.
+- Chat with the generated press release directly in the app.
 - Logs events and generated content to `app.log` for troubleshooting.
 
 ## Setup
