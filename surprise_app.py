@@ -117,10 +117,12 @@ if st.session_state["press_release"]:
                 )
                 reply = response.choices[0].message.content.strip()
                 st.session_state["messages"].append({"role": "assistant", "content": reply})
+
                 if hasattr(st, "rerun"):
                     st.rerun()
                 elif hasattr(st, "experimental_rerun"):
                     st.experimental_rerun()
+
             except Exception as exc:
                 logger.exception("Error during chat: %s", exc)
                 st.error(f"An error occurred: {exc}")
