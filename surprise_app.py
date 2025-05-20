@@ -76,17 +76,14 @@ api_key = st.secrets.get("openai", {}).get("api_key") or os.getenv("OPENAI_API_K
 client = OpenAI(api_key=api_key) if api_key else None
 
 
-def build_prompt(company: str, year: int, idea: str) -> str:
-    """Create a prompt for the language model.
+def build_prompt(product: str, feedback: str) -> str:
+    """Create a prompt asking for an action plan.
 
-    Starts with "Write a press release" so tests can verify the output but
-    also instructs the model to provide an ethics analysis.
+    The wording is intentionally fixed so tests can easily verify it.
     """
     return (
-        f"Write a press release announcing that {company} plans a {idea} in {year}. "
-        "After the press release, analyze the business idea from ethical, legal, and "
-        "reputational risk perspectives. List potential concerns clearly in bullet points. "
-        "Make it fun, intuitive, and cool!"
+        f"Generate a fun action plan to address this feedback for {product}: {feedback}. "
+        "Respond in short bullet points and keep it cool and intuitive!"
     )
 
 
@@ -103,16 +100,12 @@ def read_log_file(path: str, max_lines: int = 10) -> str:
         return f"Error reading log file: {exc}"
 
 
-def analyze_business_idea(idea: str) -> str:
-    """Send the business idea to OpenAI for analysis."""
+def generate_action_plan(product: str, feedback: str) -> str:
+    """Ask OpenAI to suggest an action plan based on feedback."""
     if not client:
         return "OpenAI API key not found."
 
-    prompt = (
-        "Analyze the following business idea from ethical, legal, and reputational "
-        "risk perspectives. List potential concerns clearly in bullet points. "
-        "Make it fun, intuitive, and cool!\n\n" + idea
-    )
+    prompt = build_prompt(product, feedback)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
@@ -121,15 +114,16 @@ def analyze_business_idea(idea: str) -> str:
 
 
 # Streamlit UI
-st.title("Ethics Radar")
+st.title("Feedback Buddy")
 
-idea_text = st.text_area("Describe your business idea:")
-if st.button("Analyze"):
-    if idea_text.strip():
-        logging.info("Received idea: %s", idea_text)
-        with st.spinner("Scanning for risks..."):
-            result = analyze_business_idea(idea_text)
+product_name = st.text_area("Which product or service is this about?")
+feedback_text = st.text_area("Share your feedback:")
+if st.button("Get Action Plan"):
+    if product_name.strip() and feedback_text.strip():
+        logging.info("Received feedback: %s", feedback_text)
+        with st.spinner("Thinking up improvements..."):
+            result = generate_action_plan(product_name, feedback_text)
         st.markdown(result)
-        logging.info("Analysis complete")
+        logging.info("Plan generated")
     else:
-        st.warning("Please enter a business idea to analyze.")
+        st.warning("Please enter the product name and your feedback.")

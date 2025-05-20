@@ -1,5 +1,5 @@
-# Ethics Radar
+# Feedback Buddy
 
-A small Streamlit application for exploring ethical, legal and reputational risks of a business idea.
+A playful Streamlit application where customers can share feedback about a product or service and instantly get an AI‑generated action plan.
 
-The `surprise_app.py` module provides helper functions used in the tests and defines a simple UI. If the `streamlit` and `openai` packages are not installed, lightweight fallbacks are used so the module can still be imported during testing.
+The `surprise_app.py` module provides helper functions used in the tests and defines a simple UI. If the `streamlit` or `openai` packages are not installed, lightweight fallbacks allow the module to be imported during testing.
