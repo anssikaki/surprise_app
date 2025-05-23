@@ -1,3 +1,21 @@
+"""Tests for functions in ``surprise_app``.
+
+When this file is executed directly (for example via ``streamlit run``), the
+parent directory is not on ``sys.path`` which results in ``ModuleNotFoundError``
+for ``surprise_app``.  To make the tests runnable in that scenario we insert the
+repository root onto ``sys.path`` before importing the module.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Ensure the repository root is importable when the tests are executed directly
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from surprise_app import build_prompt, read_log_file
 
 
